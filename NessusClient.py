@@ -7,6 +7,9 @@ import time
 import ssl
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.poolmanager import PoolManager
+from collections import OrderedDict
+import json
+requests.packages.urllib3.disable_warnings()
 
 
 class MyAdapter(HTTPAdapter):
@@ -246,6 +249,17 @@ class NessusRestClient:
         else:
             raise Exception('Unknown Response')
 
+    def get_scan_history(self, scan_id):
+        url = self.url + '/scans/' + str(scan_id)
+        r = self.__request(url, method='GET')
+        if r.status_code == 200:
+            return r.json()['history']
+        elif r.status_code == 404:
+            raise Exception('Scan does not exist')
+        else:
+            raise Exception('Unknown Response')
+
+
     def get_settings_dict(self, policy_uuid, scan_name, description,
                           emails, targets, folder_id=None):
         ''' returns an scan settings dictionary.
@@ -399,3 +413,35 @@ class NessusRestClient:
         time.sleep(3)
         contents = self.download_export(scan_id, file_id)
         return contents
+
+    def delete_history_item(self, scan_id, history_id):
+        ''' delete a single history item in a scan by its history_id '''
+        url = self.url + '/scans/' + str(scan_id) + '/history/' + str(history_id)
+        r = self.__request(url, method='DELETE')
+        if r.status_code == 200:
+            return r.status_code
+        elif r.status_code == 404:
+            raise Exception('History item not found')
+        elif r.status_code == 500:
+            raise Exception('History deletion failed')
+        else:
+            raise Exception('Delete History - Unknown Status')
+
+    def clean_history(self, scan_id, history_entries_to_keep=3):
+        ''' deletes oldest history items except for the number of entries specified '''
+        history_list = self.get_scan_history(scan_id)
+        if history_list is not None:
+            history_length = len(history_list)
+        else:
+            history_length = 1
+        if history_length > history_entries_to_keep:
+            sort_order = ['creation_date','last_modification_date','status','history_id','alt_targets_used','owner_id','scheduler','type','uuid']
+            history_list_ordered = [OrderedDict(sorted(item.iteritems(), key=lambda (k, v): sort_order.index(k)))
+                        for item in history_list]
+            for current_history_index in range(history_length - history_entries_to_keep):
+                result = self.delete_history_item(scan_id, history_list_ordered[current_history_index]['history_id'])
+                print "Deleted history_id: " + str(history_list_ordered[current_history_index]['history_id']) + ' from scan_id: ' + str(scan_id)
+        else:
+            print "No history items marked for deletion for scan_id: " + str(scan_id) + "."
+
+
