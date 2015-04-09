@@ -5,31 +5,16 @@
 import requests
 import time
 import ssl
-from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.poolmanager import PoolManager
 from collections import OrderedDict
 import json
-requests.packages.urllib3.disable_warnings()
-
-
-class MyAdapter(HTTPAdapter):
-    ''' via https://lukasa.co.uk/2013/01/Choosing_SSL_Version_In_Requests/
-        At the time of writing this, *.nessus.org only accepts TLS1.0.
-        This adapter forces requests to use TLS1.0
-    '''
-    def init_poolmanager(self, connections, maxsize, block=False):
-        self.poolmanager = PoolManager(num_pools=connections,
-                                       maxsize=maxsize,
-                                       block=block,
-                                       ssl_version=ssl.PROTOCOL_TLSv1)
 
 
 class NessusRestClient:
-    ''' Uses the undocumented REST API for Nessus (ie, the web interface) '''
+    ''' Based on documentedion from https://cloud.tenable.com/api '''
 
     def __init__(self, server, username, password,
                  port=443, verify=True, proxies=None):
-        ''' 'server' - https://nessus.server.org
+        ''' 'server' - https://cloud.tenable.com
             'username' - login username
             'password' - login password
             'verify' - SSL cert verification
@@ -37,7 +22,6 @@ class NessusRestClient:
             'proxies' - optional; dict of 'http' and 'https' proxies w port
         '''
         self.s = requests.Session()
-        self.s.mount('https://', MyAdapter())
         self.server = server
         self.port = port
         self.url = '%s:%s' % (server, str(port))
@@ -95,10 +79,10 @@ class NessusRestClient:
         data = {'username': self.username,
                 'password': self.password}
         if self.proxies:
-            r = self.s.post(url=url, data=data, proxies=self.proxies,
+            r = self.s.post(url=url, json=data, proxies=self.proxies,
                             verify=self.verify)
         else:
-            r = self.s.post(url=url, data=data, verify=self.verify)
+            r = self.s.post(url=url, json=data, verify=self.verify)
         contents = r.json()
         self.token = contents['token']
         self.authenticated = True
