@@ -313,9 +313,9 @@ class NessusRestClient:
         ''' delete a scan by its scan_id '''
         url = self.url + '/scans/' + str(scan_id)
         r = self.__request(url, method='DELETE')
-        if r.status_code == 200:
-            return r.json()
-        elif r.status_code == 500:
+        #if r.status_code == 200:
+            #return r.json()
+        if r.status_code == 500:
             raise Exception('Scan deletion failed')
         else:
             raise Exception('Delete Scan - Unknown Status')
